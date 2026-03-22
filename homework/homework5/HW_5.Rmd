@@ -1,0 +1,250 @@
+---
+title: "HW5_r"
+output: pdf_document
+date: "2026-01-23"
+---
+
+Jona Nakai
+DS 4420
+Homework #5
+
+## Problem 4
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library}
+library(ggplot2)
+```
+
+```{r data}
+spotify <- read.csv('ds4420_spotify.csv')
+head(spotify)
+
+explicit <- spotify$explicit
+n <- length(explicit)
+y <- sum(explicit)
+alpha <- 2
+beta <- 18
+```
+
+```{r distribution}
+prior <- function(theta, alpha, beta) {
+  log_num <- (alpha - 1) * log(theta) + (beta - 1) * log(1 - theta)
+  log_den <- lbeta(alpha, beta)
+  exp(log_num - log_den)
+}
+
+posterior <- function(theta, alpha, beta, y, n) {
+  alpha_star <- alpha + y
+  beta_star <- beta + n - y
+  log_num <- (alpha_star - 1) * log(theta) + (beta_star - 1) * log(1 - theta)
+  log_den <- lbeta(alpha_star, beta_star)
+  exp(log_num - log_den)
+}
+```
+
+```{r plot_1}
+sim_theta <- seq(0.001, 0.999, length.out = 1000)
+prior_dist <- prior(sim_theta, alpha, beta)
+post_dist <- posterior(sim_theta, alpha, beta, y, n)
+
+plot_df <- data.frame(theta = sim_theta, Prior = prior_dist, Posterior = post_dist)
+ggplot(plot_df, aes(x = theta)) +
+  geom_line(aes(y = Prior, color = 'Prior Distribution')) +
+  geom_line(aes(y = Posterior, color = 'Posterior Distribution')) +
+  labs(x = expression(theta), y = expression(p(theta))) +
+  scale_color_manual(name = "Legend", values = c(
+    "Prior Distribution" = "green", 
+    "Posterior Distribution" = "orange"
+  ))
+
+```
+
+```{r plot_2}
+prior_mean <- alpha / (alpha + beta)
+MLE <- y / n
+posterior_mean <- (alpha + y) / (alpha + beta + n)
+
+prior_mean
+MLE
+posterior_mean
+
+ggplot(plot_df, aes(x = theta)) +
+  geom_line(aes(y = Prior, color = "Prior Distribution")) +
+  geom_line(aes(y = Posterior, color = "Posterior Distribution")) +
+  geom_vline(aes(xintercept = prior_mean, color = "Prior Mean")) +
+  geom_vline(aes(xintercept = MLE, color = "MLE")) +
+  geom_vline(aes(xintercept = posterior_mean, color = "Posterior Mean")) +
+  labs(x = expression(theta), y = expression(p(theta))) +
+  scale_color_manual(name = "Legend", values = c(
+    "Prior Distribution" = "green", 
+    "Posterior Distribution" = "orange",
+    "Prior Mean" = "red",
+    "MLE" = "blue",
+    "Posterior Mean" = "purple"
+  ))
+```
+
+The posterior mean being in between the prior and MLE makes sense as it is a weighted average of the prior and MLE. As n, 
+the number of observations in our data set, grows, our posterior will converge to our MLE. The prior mean is just
+our initial belief before using the data, while the MLE represents the data. We would use our posterior mean as our 
+estimate for theta. So the probability of a song being explicit would be our posterior mean. To validate the performance
+of our model, we can train test split the data, use the train data to create a posterior, and compare the posterior mean
+to the percentage of explicit music in our test data set.
+
+
+## Problem 5 Part
+
+```{r part_a}
+track_pop <- spotify$track_pop
+n <- length(track_pop)
+y_bar <- mean(track_pop)
+sigma <- 20
+eta <- 50
+tao <- 2
+mu_star <- (((n * y_bar) / sigma^2) + (eta / tao^2)) / ((n / sigma^2) + (1 / tao^2))
+sigma_star <- sqrt(((n / sigma^2) + (1 / tao^2))^-1)
+
+prior <- function(mu, eta, tao) {
+  (1 / (tao * sqrt(2 * pi))) * exp(-(mu - eta)^2 / (2 * tao^2))
+}
+
+posterior <- function(mu, mu_star, sigma_star) {
+  prior(mu, mu_star, sigma_star)
+}
+
+prior_mean <- eta
+MLE <- y_bar
+posterior_mean <- mu_star
+
+prior_mean
+MLE
+posterior_mean
+
+sim_mu <- seq(40, 80, length.out = 1000)
+prior_dist <- prior(sim_mu, eta, tao)
+post_dist <- posterior(sim_mu, mu_star, sigma_star)
+
+plot_df <- data.frame(mu = sim_mu, Prior = prior_dist, Posterior = post_dist)
+ggplot(plot_df, aes(x = mu)) +
+  geom_line(aes(y = Prior, color = "Prior Distribution")) +
+  geom_line(aes(y = Posterior, color = "Posterior Distribution")) +
+  geom_vline(aes(xintercept = prior_mean, color = "Prior Mean")) +
+  geom_vline(aes(xintercept = MLE, color = "MLE")) +
+  geom_vline(aes(xintercept = posterior_mean, color = "Posterior Mean")) +
+  labs(x = expression(mu), y = expression(p(mu))) +
+  scale_color_manual(name = "Legend", values = c(
+    "Prior Distribution" = "green",
+    "Posterior Distribution" = "orange",
+    "Prior Mean" = "red",
+    "MLE" = "blue",
+    "Posterior Mean" = "purple"
+  ))
+```
+
+The posterior mean is close to the MLE as the large dataset weighs the posterior to be closer to the MLE. The prior mean
+is our initial belief before data, the MLE reflects our data, and the posterior utilizes both our initial belief and 
+our data.
+
+```{r part_b_1}
+eta <- 75
+tao <- 2
+mu_star <- (((n * y_bar) / sigma^2) + (eta / tao^2)) / ((n / sigma^2) + (1 / tao^2))
+sigma_star <- sqrt(((n / sigma^2) + (1 / tao^2))^-1)
+
+prior <- function(mu, eta, tao) {
+  (1 / (tao * sqrt(2 * pi))) * exp(-(mu - eta)^2 / (2 * tao^2))
+}
+
+posterior <- function(mu, mu_star, sigma_star) {
+  prior(mu, mu_star, sigma_star)
+}
+
+prior_mean <- eta
+MLE <- y_bar
+posterior_mean <- mu_star
+
+prior_mean
+MLE
+posterior_mean
+
+sim_mu <- seq(40, 80, length.out = 1000)
+prior_dist <- prior(sim_mu, eta, tao)
+post_dist <- posterior(sim_mu, mu_star, sigma_star)
+
+plot_df <- data.frame(mu = sim_mu, Prior = prior_dist, Posterior = post_dist)
+ggplot(plot_df, aes(x = mu)) +
+  geom_line(aes(y = Prior, color = "Prior Distribution")) +
+  geom_line(aes(y = Posterior, color = "Posterior Distribution")) +
+  geom_vline(aes(xintercept = prior_mean, color = "Prior Mean")) +
+  geom_vline(aes(xintercept = MLE, color = "MLE")) +
+  geom_vline(aes(xintercept = posterior_mean, color = "Posterior Mean")) +
+  labs(x = expression(mu), y = expression(p(mu))) +
+  scale_color_manual(name = "Legend", values = c(
+    "Prior Distribution" = "green",
+    "Posterior Distribution" = "orange",
+    "Prior Mean" = "red",
+    "MLE" = "blue",
+    "Posterior Mean" = "purple"
+  ))
+```
+
+The MLE is now on the left side because our eta value is larger than our MLE. The posterior mean still leans close to
+our MLE. 
+
+```{r part_b_2}
+eta <- 50
+tao <- 5
+mu_star <- (((n * y_bar) / sigma^2) + (eta / tao^2)) / ((n / sigma^2) + (1 / tao^2))
+sigma_star <- sqrt(((n / sigma^2) + (1 / tao^2))^-1)
+
+prior <- function(mu, eta, tao) {
+  (1 / (tao * sqrt(2 * pi))) * exp(-(mu - eta)^2 / (2 * tao^2))
+}
+
+posterior <- function(mu, mu_star, sigma_star) {
+  prior(mu, mu_star, sigma_star)
+}
+
+prior_mean <- eta
+MLE <- y_bar
+posterior_mean <- mu_star
+
+prior_mean
+MLE
+posterior_mean
+
+sim_mu <- seq(40, 80, length.out = 1000)
+prior_dist <- prior(sim_mu, eta, tao)
+post_dist <- posterior(sim_mu, mu_star, sigma_star)
+
+plot_df <- data.frame(mu = sim_mu, Prior = prior_dist, Posterior = post_dist)
+ggplot(plot_df, aes(x = mu)) +
+  geom_line(aes(y = Prior, color = "Prior Distribution")) +
+  geom_line(aes(y = Posterior, color = "Posterior Distribution")) +
+  geom_vline(aes(xintercept = prior_mean, color = "Prior Mean")) +
+  geom_vline(aes(xintercept = MLE, color = "MLE")) +
+  geom_vline(aes(xintercept = posterior_mean, color = "Posterior Mean")) +
+  labs(x = expression(mu), y = expression(p(mu))) +
+  scale_color_manual(name = "Legend", values = c(
+    "Prior Distribution" = "green",
+    "Posterior Distribution" = "orange",
+    "Prior Mean" = "red",
+    "MLE" = "blue",
+    "Posterior Mean" = "purple"
+  ))
+```
+
+Compared to the other two, our posterior mean is closest to our MLE. This is due to a wider prior distribution, allowing
+for the posterior distribution to be pulled towards our MLE much more.
+
+### Part_c
+
+The prior distribution with eta = 75 and tao = 2 resulted in the more significantly differnet posterior. This was due 
+to the prior mean being shifted so far from the MLE. This exercised helped me understand how shifting parameters results
+in different posteriors. Not necessarily better or worse, but different. By shifting the parameters, different posteriors
+result. Some more or less influenced by the prior. Some lean the posterior in different directions by shifting the prior
+mean. In practice, I would use a train test split to choose different hyperparameters and evaluate them to help me choose
+the best possible hyperparameters.
