@@ -1,0 +1,141 @@
+---
+title: "Homework 6"
+author: "Jona Nakai"
+date: "DS 4420"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
+
+## Problem 2
+
+### Part (a)
+
+```{r}
+set.seed(42)
+
+# Define the target distribution: logit-normal with mu=1, sigma=2
+p <- function(theta, mu = 1, sigma = 2) {
+  logit_theta <- log(theta / (1 - theta))
+  (1 / (sqrt(2 * pi) * sigma)) * exp(-(logit_theta - mu)^2 / (2 * sigma^2)) / (theta * (1 - theta))
+}
+
+# Define the proposal distribution: Beta(1,1) = Uniform(0,1)
+q <- function(v) {
+  dbeta(v, 1, 1)
+}
+
+# Verify that k*q(v) >= p(v) for all 0 < v < 1
+k <- 5
+theta_vals <- seq(0.001, 0.999, length.out = 1000)
+p_vals <- p(theta_vals)
+kq_vals <- k * q(theta_vals)
+
+plot(theta_vals, p_vals, type = "l", col = "blue", lwd = 2,
+     ylim = c(0, max(kq_vals)), ylab = "Density", xlab = expression(theta),
+     main = "Verification: k*q(v) >= p(v)")
+lines(theta_vals, kq_vals, col = "red", lwd = 2)
+legend("topright", legend = c("p(theta)", "k*q(v)"), col = c("blue", "red"), lty = 1)
+```
+
+```{r}
+# Rejection sampling from the logit-normal prior
+rejection_sampling <- function(n) {
+  samples <- c()
+  while (length(samples) < n) {
+    v <- rbeta(1, 1, 1)
+    if (k * q(v) * runif(1) < p(v)) {
+      samples <- c(samples, v)
+    }
+  }
+  return(samples)
+}
+
+theta_samples <- rejection_sampling(10000)
+```
+
+```{r}
+# Verify samples follow p(theta) by overlaying histogram with theoretical density
+ggplot(data.frame(theta = theta_samples), aes(x = theta)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 80, fill = "blue", alpha = 0.5) +
+  stat_function(fun = p, col = "red", lwd = 1) +
+  labs(title = "Rejection Sampling from Logit-Normal Prior",
+       x = expression(theta), y = "Density")
+```
+
+### Part (b)
+
+```{r}
+set.seed(42)
+
+# Use theta samples from (a); sample y | theta ~ Bern(theta)
+y_samples <- rbinom(length(theta_samples), size = 1, prob = theta_samples)
+
+# Theoretical joint p(y, theta) computed on a grid for y in {0, 1}
+p_joint_y0 <- (1 - theta_vals) * p(theta_vals)
+p_joint_y1 <- theta_vals * p(theta_vals)
+
+# Plot 1: theoretical joint distribution
+plot(theta_vals, p_joint_y1, type = "l", col = "red", lwd = 2,
+     ylim = c(0, max(p_joint_y0, p_joint_y1)),
+     xlab = expression(theta), ylab = "p(y, theta)",
+     main = "Theoretical Joint Distribution p(y, theta)")
+lines(theta_vals, p_joint_y0, col = "blue", lwd = 2)
+legend("topright", legend = c("y = 1", "y = 0"), col = c("red", "blue"), lty = 1)
+```
+
+```{r}
+# Plot 2: empirical joint distribution from ancestral samples
+joint_df <- data.frame(theta = theta_samples, y = as.factor(y_samples))
+
+ggplot(joint_df, aes(x = theta, fill = y)) +
+  geom_histogram(position = "stack", bins = 100) +
+  scale_fill_manual(values = c("blue", "red")) +
+  labs(title = "Empirical Joint Distribution from Ancestral Samples",
+       x = expression(theta), y = "Frequency")
+```
+
+## Problem 3
+
+### Part (a)
+
+```{r}
+library(mvtnorm)
+
+p <- function(y, mu, Sigma) {
+  dmvnorm(y, mean = mu, sigma = Sigma)
+}
+
+gaussian_metropolis <- function(n, mu, Sigma, sigma = 2, burn = 0.18) {
+  samples <- list()
+  y1 <- mu[1]
+  y2 <- mu[2]
+  total_samples <- floor(n / (1 - burn))
+  m <- as.integer(total_samples * burn)
+  accepted <- 0
+
+  while (length(samples) < total_samples) {
+    y1_prop <- rnorm(1, y1, sigma)
+    y2_prop <- rnorm(1, y2, sigma)
+    alpha <- p(c(y1_prop, y2_prop), mu, Sigma) / p(c(y1, y2), mu, Sigma)
+
+    if (runif(1) < alpha) {
+      y1 <- y1_prop
+      y2 <- y2_prop
+      accepted <- accepted + 1
+    }
+    samples[[length(samples) + 1]] <- c(y1, y2)
+  }
+
+  acceptance_rate <- accepted / total_samples
+  cat(sprintf('Acceptance rate: %.3f\n', acceptance_rate))
+
+  samples <- do.call(rbind, samples)
+  samples <- samples[(m + 1):nrow(samples), ]
+
+  return(samples)
+}
+```
